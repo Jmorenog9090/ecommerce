@@ -1,10 +1,13 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
   provider = "postgresql"
 }
+
+// ─── Auth & Users ────────────────────────────────────────────
 
 model Role {
   id    Int    @id @default(autoincrement())
@@ -18,11 +21,146 @@ model User {
   email          String   @unique
   passwordHash   String
   profilePicture String?
+  isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   roleId         Int
-  isActive       Boolean  @default(true)
   role           Role     @relation(fields: [roleId], references: [id])
 
+  // Relaciones futuras (Fase 3+)
+  ownedStores Store[] @relation("StoreOwner")
+  orders      Order[]
+
   @@index([roleId])
+  @@index([email])
+}
+
+// ─── Multi-tenant: Stores ────────────────────────────────────
+
+model Store {
+  id          Int      @id @default(autoincrement())
+  name        String
+  slug        String   @unique
+  description String?
+  logoUrl     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  ownerId     Int
+  owner       User     @relation("StoreOwner", fields: [ownerId], references: [id])
+
+  products      Product[]
+  orders        Order[]
+  shippingRules ShippingRule[]
+
+  @@index([ownerId])
+  @@index([slug])
+}
+
+// ─── Catálogo ────────────────────────────────────────────────
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  basePrice   Decimal  @db.Decimal(10, 2)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  storeId     Int
+  store       Store    @relation(fields: [storeId], references: [id])
+
+  variants Variant[]
+
+  @@index([storeId])
+}
+
+model Variant {
+  id        Int      @id @default(autoincrement())
+  name      String // e.g. "Roja - XL"
+  sku       String   @unique
+  price     Decimal  @db.Decimal(10, 2)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id])
+
+  inventory  Inventory?
+  orderItems OrderItem[]
+
+  @@index([productId])
+}
+
+model Inventory {
+  id        Int      @id @default(autoincrement())
+  stock     Int      @default(0)
+  reserved  Int      @default(0)
+  updatedAt DateTime @updatedAt
+  variantId Int      @unique
+  variant   Variant  @relation(fields: [variantId], references: [id])
+}
+
+// ─── Orders ──────────────────────────────────────────────────
+
+model Order {
+  id        Int         @id @default(autoincrement())
+  status    OrderStatus @default(PENDING)
+  total     Decimal     @db.Decimal(10, 2)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  userId    Int
+  user      User        @relation(fields: [userId], references: [id])
+  storeId   Int
+  store     Store       @relation(fields: [storeId], references: [id])
+
+  items           OrderItem[]
+  stripePaymentId String?
+
+  @@index([userId])
+  @@index([storeId])
+  @@index([status])
+}
+
+model OrderItem {
+  id          Int     @id @default(autoincrement())
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(10, 2) // snapshot del precio
+  productName String // snapshot del nombre del producto
+  variantName String // snapshot del nombre de la variante
+  orderId     Int
+  order       Order   @relation(fields: [orderId], references: [id])
+  variantId   Int
+  variant     Variant @relation(fields: [variantId], references: [id])
+
+  @@index([orderId])
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+// ─── Shipping ────────────────────────────────────────────────
+
+model ShippingRule {
+  id          Int          @id @default(autoincrement())
+  name        String
+  type        ShippingType @default(FLAT_RATE)
+  price       Decimal      @db.Decimal(10, 2)
+  minOrderAmt Decimal?     @db.Decimal(10, 2)
+  isActive    Boolean      @default(true)
+  storeId     Int
+  store       Store        @relation(fields: [storeId], references: [id])
+
+  @@index([storeId])
+}
+
+enum ShippingType {
+  FLAT_RATE
+  CONDITIONAL
+  FREE
 }

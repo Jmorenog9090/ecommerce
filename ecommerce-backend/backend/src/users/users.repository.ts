@@ -40,6 +40,13 @@ export class UsersRepository {
             where: { email },
         });
     }
+    /** Retorna el usuario con passwordHash y role (para validación de auth) */
+    findByEmailWithPassword(email: string) {
+        return this.prisma.user.findUnique({
+            where: { email },
+            include: { role: true },
+        });
+    }
     create(data: Omit<CreateUserDto, 'password'> & { passwordHash: string }) {
         return this.prisma.user.create({
             data,

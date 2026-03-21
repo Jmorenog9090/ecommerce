@@ -1,13 +1,13 @@
 # Fases del Proyecto
 
 ### Fase 1: Setup
-*Estado: [In Progress] - YYYY-MM-DD*
+*Estado: [Done] - 2026-03-20*
 - Estructura de repositorios y directorios.
 - Iniciar configuración Base y Boilerplate (NestJS, Prisma, Docker).
 - Redacción de documentación viva `/docs`.
 
 ### Fase 2: Database Schema & Auth
-*Estado: [To Do]*
+*Estado: [In Progress] - 2026-03-21*
 - Modelado del Prisma Schema.
 - Módulos `Users` y `Roles` y `Auth` listos e inicializados con Guards JWT globales.
 

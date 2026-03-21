@@ -3,15 +3,21 @@ import {
     NotFoundException,
     ConflictException,
     BadRequestException,
+    InternalServerErrorException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { UsersRepository } from './users.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { PrismaService } from '../prisma/prisma.service';
+
 const SALT_ROUNDS = 10;
 @Injectable()
 export class UsersService {
-    constructor(private readonly usersRepository: UsersRepository) { }
+    constructor(
+        private readonly usersRepository: UsersRepository,
+        private readonly prisma: PrismaService,
+    ) { }
     findAll() {
         return this.usersRepository.findAll();
     }
@@ -55,5 +61,39 @@ export class UsersService {
     async remove(id: number) {
         await this.findOne(id); // lanza NotFoundException si no existe
         return this.usersRepository.softDelete(id);
+    }
+
+    /** Busca usuario por email incluyendo passwordHash y role (para auth) */
+    findByEmailWithPassword(email: string) {
+        return this.usersRepository.findByEmailWithPassword(email);
+    }
+
+    /**
+     * Crea un usuario con rol CUSTOMER por defecto.
+     * Usado por AuthService.register().
+     */
+    async createForAuth(data: { name: string; email: string; password: string }) {
+        const existing = await this.usersRepository.findByEmail(data.email);
+        if (existing) {
+            throw new ConflictException(`El email ${data.email} ya está registrado`);
+        }
+
+        // Buscar el rol CUSTOMER
+        const customerRole = await this.prisma.role.findUnique({
+            where: { name: 'CUSTOMER' },
+        });
+        if (!customerRole) {
+            throw new InternalServerErrorException(
+                'El rol CUSTOMER no existe en la base de datos. Ejecuta el seed primero.',
+            );
+        }
+
+        const passwordHash = await bcrypt.hash(data.password, SALT_ROUNDS);
+        return this.usersRepository.create({
+            name: data.name,
+            email: data.email,
+            passwordHash,
+            roleId: customerRole.id,
+        });
     }
 }

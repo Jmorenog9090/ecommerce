@@ -57,5 +57,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 /ecommerce-backend/backend/generated/prisma
 
+/ecommerce-backend/.env
+
 # AI Agent Skills
 /SKILLS
